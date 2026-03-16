@@ -1,4 +1,3 @@
-// web.js - Interface melhorada (Tailwind CDN, modais, progress, CRUD básico)
 const express = require("express");
 const ftp = require("basic-ftp");
 const multer = require("multer");
@@ -13,7 +12,7 @@ app.use(express.urlencoded({ extended: true }));
 
 let ftpConfig = null;
 
-// ---------------- helpers ----------------
+
 function formatBytes(bytes) {
   if (!bytes && bytes !== 0) return "";
   const sizes = ["B", "KB", "MB", "GB", "TB"];
@@ -62,7 +61,7 @@ function fileKind(ext) {
   return map[ext] || "file";
 }
 
-// ---------------- page template ----------------
+
 function page(contentHtml, note = "") {
   return `<!doctype html>
 <html>
@@ -196,7 +195,7 @@ async function ajaxUpload(dir){
 </html>`;
 }
 
-// ---------------- ROUTES ----------------
+
 
 app.get("/", (req, res) => {
   const loginCard = `
@@ -320,7 +319,7 @@ app.get("/files", async (req, res) => {
   }
 });
 
-// ---------------- streaming preview (no disk) ----------------
+
 app.get("/preview", async (req, res) => {
   if (!ftpConfig) return res.status(400).send("not connected");
   const file = req.query.file;
@@ -339,7 +338,6 @@ app.get("/preview", async (req, res) => {
   }
 });
 
-// ---------------- raw text for modal ----------------
 app.get("/raw", async (req, res) => {
   if (!ftpConfig) return res.status(400).send("not connected");
   const file = req.query.file;
@@ -363,7 +361,7 @@ app.get("/raw", async (req, res) => {
   }
 });
 
-// ---------------- download (stream) ----------------
+
 app.get("/download", async (req, res) => {
   if (!ftpConfig) return res.status(400).send("not connected");
   const file = req.query.file;
@@ -380,7 +378,7 @@ app.get("/download", async (req, res) => {
   }
 });
 
-// ---------------- mkdir ----------------
+
 app.post("/mkdir", async (req, res) => {
   const name = req.body.name;
   const dir = req.body.dir || "/";
@@ -395,7 +393,7 @@ app.post("/mkdir", async (req, res) => {
   }
 });
 
-// ---------------- rename ----------------
+
 app.post("/rename", async (req, res) => {
   const { oldName, newName, dir } = req.body;
   try {
@@ -409,7 +407,7 @@ app.post("/rename", async (req, res) => {
   }
 });
 
-// ---------------- delete ----------------
+
 app.post("/delete", async (req, res) => {
   const { file, dir } = req.body;
   try {
@@ -423,7 +421,7 @@ app.post("/delete", async (req, res) => {
   }
 });
 
-// ---------------- upload (multer temp) - supports AJAX XHR and form ----------------
+
 app.post("/upload", upload.single("file"), async (req, res) => {
   const dir = req.query.dir || "/";
   if (!req.file) return res.send(page("", "Nenhum arquivo enviado"));
@@ -439,7 +437,7 @@ app.post("/upload", upload.single("file"), async (req, res) => {
   }
 });
 
-// ---------------- start ----------------
+
 app.listen(3000, () => {
   console.log("Web UI: http://localhost:3000");
 });
