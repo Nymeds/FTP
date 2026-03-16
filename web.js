@@ -1,3 +1,4 @@
+// web.js - Interface melhorada (Tailwind CDN, modais, progress, CRUD básico)
 const express = require("express");
 const ftp = require("basic-ftp");
 const multer = require("multer");
@@ -12,7 +13,17 @@ app.use(express.urlencoded({ extended: true }));
 
 let ftpConfig = null;
 
+// ─── Logger ───────────────────────────────────────────────────────────────────
+const LOG_FILE = path.join(__dirname, "web.log");
 
+function log(level, msg, extra = "") {
+  const icons = { INFO: "ℹ️ ", WARN: "⚠️ ", ERROR: "❌", OK: "✅", EVENT: "📡" };
+  const line = `[${new Date().toISOString()}] [${level}] ${msg}${extra ? " | " + extra : ""}`;
+  console.log(`${icons[level] || "  "} ${line}`);
+  fs.appendFileSync(LOG_FILE, line + "\n");
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 function formatBytes(bytes) {
   if (!bytes && bytes !== 0) return "";
   const sizes = ["B", "KB", "MB", "GB", "TB"];
@@ -61,7 +72,7 @@ function fileKind(ext) {
   return map[ext] || "file";
 }
 
-
+// ─── Template ─────────────────────────────────────────────────────────────────
 function page(contentHtml, note = "") {
   return `<!doctype html>
 <html>
@@ -82,7 +93,7 @@ pre.code{ background:#071026; color:#dff0ff; padding:12px; border-radius:8px; ma
     <header class="flex items-start justify-between gap-4 mb-6">
       <div>
         <h1 class="text-2xl font-semibold text-cyan-400">FTP Manager</h1>
-        <p class="text-sm text-slate-400">Conecte ao servidor e gerencie arquivos — interface limpa para apresentação</p>
+        <p class="text-sm text-slate-400">Conecte ao servidor e gerencie arquivos</p>
       </div>
       <div class="text-sm text-right">
         ${ftpConfig ? `<div class="text-slate-300">Server: ${safe(ftpConfig.host)}:${safe(ftpConfig.port)}</div><div class="text-slate-400">User: ${safe(ftpConfig.user)}</div>` : `<div class="text-slate-400">Não conectado</div>`}
@@ -92,17 +103,13 @@ pre.code{ background:#071026; color:#dff0ff; padding:12px; border-radius:8px; ma
     ${note ? `<div class="mb-4 p-3 rounded bg-amber-500 text-black">${safe(note)}</div>` : ""}
 
     ${contentHtml}
-
   </div>
 
-  <!-- modal -->
   <div id="modal" class="hidden fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
     <div class="bg-slate-800 w-full max-w-3xl rounded-lg overflow-auto">
       <div class="flex justify-between items-center p-4 border-b border-slate-700">
         <div id="modalTitle" class="font-semibold"></div>
-        <div>
-          <button onclick="closeModal()" class="px-3 py-1 rounded bg-slate-700 hover:bg-slate-600">Fechar</button>
-        </div>
+        <button onclick="closeModal()" class="px-3 py-1 rounded bg-slate-700 hover:bg-slate-600">Fechar</button>
       </div>
       <div id="modalBody" class="p-4"></div>
     </div>
@@ -134,13 +141,11 @@ async function showText(name,dir){
   }
 }
 function confirmDelete(file, dir){
-  if(!confirm('Deletar \"'+file+'\" ?')) return;
+  if(!confirm('Deletar "'+file+'" ?')) return;
   const form = document.createElement('form');
-  form.method='POST';
-  form.action='/delete';
+  form.method='POST'; form.action='/delete';
   form.innerHTML = '<input type="hidden" name="dir" value="'+dir+'"><input type="hidden" name="file" value="'+file+'">';
-  document.body.appendChild(form);
-  form.submit();
+  document.body.appendChild(form); form.submit();
 }
 function openRename(oldName, dir){
   const html = '<form method="POST" action="/rename" class="space-y-2">'+
@@ -159,8 +164,6 @@ function openMkdir(dir){
     '</form>';
   openModal('Criar Pasta', html);
 }
-
-/* AJAX upload with progress */
 async function ajaxUpload(dir){
   const input = document.getElementById('fileInput');
   if(!input.files.length){ alert('Selecione um arquivo'); return; }
@@ -174,60 +177,41 @@ async function ajaxUpload(dir){
   progressBar.parentElement.classList.remove('hidden');
   xhr.upload.onprogress = function(e){
     if(e.lengthComputable){
-      const p = Math.round((e.loaded / e.total) * 100);
-      progressBar.style.width = p + '%';
+      progressBar.style.width = Math.round((e.loaded/e.total)*100)+'%';
     }
   };
   xhr.onload = function(){
     progressBar.parentElement.classList.add('hidden');
-    if(xhr.status >=200 && xhr.status <300){
-      location.reload();
-    } else {
-      alert('Erro no upload');
-    }
+    if(xhr.status>=200 && xhr.status<300){ location.reload(); }
+    else { alert('Erro no upload'); }
   };
   xhr.onerror = function(){ progressBar.parentElement.classList.add('hidden'); alert('Erro no upload'); };
   xhr.send(form);
 }
 </script>
-
 </body>
 </html>`;
 }
 
-
+// ─── Rotas ────────────────────────────────────────────────────────────────────
 
 app.get("/", (req, res) => {
   const loginCard = `
     <div class="bg-slate-800 p-6 rounded max-w-md">
       <form method="POST" action="/login" class="space-y-3">
-        <div>
-          <label class="text-sm text-slate-300">Host</label>
-          <input name="host" value="127.0.0.1" class="w-full mt-1 p-2 rounded bg-slate-700" />
-        </div>
-        <div>
-          <label class="text-sm text-slate-300">Porta</label>
-          <input name="port" value="2121" class="w-full mt-1 p-2 rounded bg-slate-700" />
-        </div>
-        <div>
-          <label class="text-sm text-slate-300">Usuário</label>
-          <input name="user" class="w-full mt-1 p-2 rounded bg-slate-700" />
-        </div>
-        <div>
-          <label class="text-sm text-slate-300">Senha</label>
-          <input type="password" name="password" class="w-full mt-1 p-2 rounded bg-slate-700" />
-        </div>
-        <div class="pt-2">
-          <button class="w-full bg-cyan-500 hover:bg-cyan-600 p-2 rounded font-semibold">Conectar</button>
-        </div>
+        <div><label class="text-sm text-slate-300">Host</label><input name="host" value="127.0.0.1" class="w-full mt-1 p-2 rounded bg-slate-700" /></div>
+        <div><label class="text-sm text-slate-300">Porta</label><input name="port" value="2121" class="w-full mt-1 p-2 rounded bg-slate-700" /></div>
+        <div><label class="text-sm text-slate-300">Usuário</label><input name="user" class="w-full mt-1 p-2 rounded bg-slate-700" /></div>
+        <div><label class="text-sm text-slate-300">Senha</label><input type="password" name="password" class="w-full mt-1 p-2 rounded bg-slate-700" /></div>
+        <div class="pt-2"><button class="w-full bg-cyan-500 hover:bg-cyan-600 p-2 rounded font-semibold">Conectar</button></div>
       </form>
-    </div>
-  `;
+    </div>`;
   res.send(page(loginCard));
 });
 
 app.post("/login", (req, res) => {
   ftpConfig = req.body;
+  log("EVENT", "Login via web", `user="${ftpConfig.user}" server=${ftpConfig.host}:${ftpConfig.port}`);
   res.redirect("/files?dir=/");
 });
 
@@ -239,28 +223,24 @@ app.get("/files", async (req, res) => {
     client = await connectFTP();
     await client.cd(dir);
     const list = await client.list();
+    log("INFO", "Listagem de pasta", `dir="${dir}" itens=${list.length}`);
 
     let content = `<div class="mb-4 text-sm text-slate-400">Navegação: ${breadcrumb(dir)}</div>`;
 
-    // top actions
     content += `
       <div class="flex gap-3 items-center mb-4">
         <button onclick="openMkdir('${dir}')" class="px-3 py-2 bg-slate-700 rounded">Nova pasta</button>
-
         <div class="flex items-center gap-2 bg-slate-800 p-2 rounded">
           <input id="fileInput" type="file" class="text-sm" />
           <button onclick="ajaxUpload('${dir}')" class="px-3 py-2 bg-green-500 rounded">Upload</button>
         </div>
-
         <div class="flex-1">
           <div id="uploadWrap" class="hidden bg-slate-800 rounded overflow-hidden mt-2">
             <div class="h-2 bg-slate-700"><div id="uploadBar" style="width:0%; height:100%; background:#06b6d4;"></div></div>
           </div>
         </div>
-      </div>
-    `;
+      </div>`;
 
-    // grid
     content += `<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">`;
 
     for (const f of list) {
@@ -270,29 +250,31 @@ app.get("/files", async (req, res) => {
             <div class="text-3xl text-slate-300 mb-3">📁</div>
             <div class="font-medium break-all">${safe(f.name)}</div>
             <div class="mt-3 flex gap-2">
-              <a href="/files?dir=${encodeURIComponent((dir === '/' ? '' : dir) + '/' + f.name)}" class="px-3 py-1 bg-cyan-600 rounded text-sm">Abrir</a>
+              <a href="/files?dir=${encodeURIComponent((dir === "/" ? "" : dir) + "/" + f.name)}" class="px-3 py-1 bg-cyan-600 rounded text-sm">Abrir</a>
               <button onclick="openRename('${f.name}','${dir}')" class="px-3 py-1 bg-yellow-500 rounded text-sm">Renomear</button>
             </div>
-          </div>
-        `;
+          </div>`;
       } else {
         const ext = (f.name.split(".").pop() || "").toLowerCase();
         const kind = fileKind(ext);
         const isImage = ["png","jpg","jpeg","gif","webp"].includes(ext);
         content += `
           <div class="card p-3 bg-slate-800 rounded flex flex-col">
-            <div class="mb-3 ${isImage ? '' : 'text-4xl text-slate-300'}">
-              ${isImage ? `<img class="thumb" src="/preview?file=${encodeURIComponent(f.name)}&dir=${encodeURIComponent(dir)}" />` : (kind === 'code' ? '<div class="text-slate-300">&lt;/&gt;</div>' : (kind==='text' ? '<div class="text-slate-300">📄</div>' : '<div class="text-slate-300">📦</div>'))}
+            <div class="mb-3 ${isImage ? "" : "text-4xl text-slate-300"}">
+              ${isImage
+                ? `<img class="thumb" src="/preview?file=${encodeURIComponent(f.name)}&dir=${encodeURIComponent(dir)}" />`
+                : (kind === "code" ? '<div class="text-slate-300">&lt;/&gt;</div>' : (kind === "text" ? '<div class="text-slate-300">📄</div>' : '<div class="text-slate-300">📦</div>'))}
             </div>
             <div class="flex-1">
               <div class="text-sm font-medium break-all">${safe(f.name)}</div>
-              <div class="text-xs text-slate-400">${f.size ? formatBytes(f.size) : ''} ${f.date ? (' • ' + new Date(f.rawModifiedAt || f.date || Date.now()).toLocaleString()) : ''}</div>
+              <div class="text-xs text-slate-400">${f.size ? formatBytes(f.size) : ""}</div>
             </div>
             <div class="mt-3 flex gap-2">
-              ${isImage ? `<button onclick="showImage('${f.name}','${dir}')" class="flex-1 px-2 py-1 bg-cyan-500 rounded text-sm">Preview</button>` : `<button onclick="showText('${f.name}','${dir}')" class="flex-1 px-2 py-1 bg-cyan-500 rounded text-sm">Abrir</button>`}
+              ${isImage
+                ? `<button onclick="showImage('${f.name}','${dir}')" class="flex-1 px-2 py-1 bg-cyan-500 rounded text-sm">Preview</button>`
+                : `<button onclick="showText('${f.name}','${dir}')" class="flex-1 px-2 py-1 bg-cyan-500 rounded text-sm">Abrir</button>`}
               <a class="px-3 py-1 bg-slate-700 rounded text-sm" href="/download?file=${encodeURIComponent(f.name)}&dir=${encodeURIComponent(dir)}">Download</a>
             </div>
-
             <div class="mt-2">
               <form method="POST" action="/delete" onsubmit="return confirm('Deletar ${f.name}?')">
                 <input type="hidden" name="dir" value="${safe(dir)}" />
@@ -300,25 +282,22 @@ app.get("/files", async (req, res) => {
                 <button class="w-full mt-1 px-2 py-1 bg-red-600 rounded text-xs">Delete</button>
               </form>
             </div>
-
             <div class="mt-2">
               <button onclick="openRename('${f.name}','${dir}')" class="w-full mt-1 px-2 py-1 bg-yellow-500 rounded text-xs">Renomear</button>
             </div>
-          </div>
-        `;
+          </div>`;
       }
     }
 
-    content += `</div>`; // grid
-
+    content += `</div>`;
     res.send(page(content));
   } catch (err) {
+    log("ERROR", "Erro ao listar pasta", `dir="${dir}" err=${err.message}`);
     res.send(page("", "Erro: " + (err.message || err.toString())));
   } finally {
     if (client) client.close();
   }
 });
-
 
 app.get("/preview", async (req, res) => {
   if (!ftpConfig) return res.status(400).send("not connected");
@@ -331,7 +310,9 @@ app.get("/preview", async (req, res) => {
     const types = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif", webp: "image/webp" };
     res.setHeader("Content-Type", types[ext] || "application/octet-stream");
     await client.downloadTo(res, file);
+    log("INFO", "Preview de imagem", `file="${file}" dir="${dir}"`);
   } catch (err) {
+    log("ERROR", "Erro no preview", `file="${file}" err=${err.message}`);
     res.status(500).send("Erro: " + err.message);
   } finally {
     client.close();
@@ -347,20 +328,18 @@ app.get("/raw", async (req, res) => {
     await client.cd(dir);
     let data = "";
     const writable = new stream.Writable({
-      write(chunk, enc, cb) {
-        data += chunk.toString();
-        cb();
-      },
+      write(chunk, enc, cb) { data += chunk.toString(); cb(); },
     });
     await client.downloadTo(writable, file);
+    log("INFO", "Visualização de texto", `file="${file}" dir="${dir}"`);
     res.type("text/plain").send(data);
   } catch (err) {
+    log("ERROR", "Erro ao abrir arquivo", `file="${file}" err=${err.message}`);
     res.status(500).send("Erro: " + err.message);
   } finally {
     client.close();
   }
 });
-
 
 app.get("/download", async (req, res) => {
   if (!ftpConfig) return res.status(400).send("not connected");
@@ -371,13 +350,14 @@ app.get("/download", async (req, res) => {
     await client.cd(dir);
     res.setHeader("Content-Disposition", `attachment; filename="${file}"`);
     await client.downloadTo(res, file);
+    log("OK", "Download concluído", `file="${file}" dir="${dir}"`);
   } catch (err) {
+    log("ERROR", "Erro no download", `file="${file}" err=${err.message}`);
     res.status(500).send("Erro: " + err.message);
   } finally {
     client.close();
   }
 });
-
 
 app.post("/mkdir", async (req, res) => {
   const name = req.body.name;
@@ -387,12 +367,13 @@ app.post("/mkdir", async (req, res) => {
     await client.cd(dir);
     await client.ensureDir(name);
     client.close();
+    log("OK", "Pasta criada", `name="${name}" dir="${dir}"`);
     res.redirect("/files?dir=" + encodeURIComponent(dir));
   } catch (err) {
+    log("ERROR", "Erro ao criar pasta", `name="${name}" err=${err.message}`);
     res.send(page("", "Erro mkdir: " + err.message));
   }
 });
-
 
 app.post("/rename", async (req, res) => {
   const { oldName, newName, dir } = req.body;
@@ -401,12 +382,13 @@ app.post("/rename", async (req, res) => {
     await client.cd(dir);
     await client.rename(oldName, newName);
     client.close();
+    log("OK", "Arquivo renomeado", `de="${oldName}" para="${newName}" dir="${dir}"`);
     res.redirect("/files?dir=" + encodeURIComponent(dir));
   } catch (err) {
+    log("ERROR", "Erro ao renomear", `de="${oldName}" para="${newName}" err=${err.message}`);
     res.send(page("", "Erro rename: " + err.message));
   }
 });
-
 
 app.post("/delete", async (req, res) => {
   const { file, dir } = req.body;
@@ -415,29 +397,35 @@ app.post("/delete", async (req, res) => {
     await client.cd(dir);
     await client.remove(file);
     client.close();
+    log("OK", "Arquivo deletado", `file="${file}" dir="${dir}"`);
     res.redirect("/files?dir=" + encodeURIComponent(dir));
   } catch (err) {
+    log("ERROR", "Erro ao deletar", `file="${file}" err=${err.message}`);
     res.send(page("", "Erro delete: " + err.message));
   }
 });
 
-
 app.post("/upload", upload.single("file"), async (req, res) => {
   const dir = req.query.dir || "/";
   if (!req.file) return res.send(page("", "Nenhum arquivo enviado"));
+  const originalName = req.file.originalname;
+  const sizeFormatted = formatBytes(req.file.size);
   try {
     const client = await connectFTP();
     await client.cd(dir);
-    await client.uploadFrom(req.file.path, req.file.originalname);
+    await client.uploadFrom(req.file.path, originalName);
     client.close();
     fs.unlinkSync(req.file.path);
+    log("OK", "Upload concluído", `file="${originalName}" tamanho=${sizeFormatted} dir="${dir}"`);
     res.redirect("/files?dir=" + encodeURIComponent(dir));
   } catch (err) {
+    log("ERROR", "Erro no upload", `file="${originalName}" err=${err.message}`);
     res.send(page("", "Erro upload: " + err.message));
   }
 });
 
-
+// ─── Start ────────────────────────────────────────────────────────────────────
 app.listen(3000, () => {
-  console.log("Web UI: http://localhost:3000");
+  log("OK", "Web UI iniciada", "http://localhost:3000");
+  log("INFO", `Log salvo em: ${LOG_FILE}`);
 });
