@@ -1,0 +1,25 @@
+# Dependências
+node_modules/
+
+# Arquivos temporários
+uploads/
+download_*
+preview_*
+
+# Arquivos FTP
+arquivos/*
+
+# Logs
+*.log
+npm-debug.log*
+
+# Arquivos do sistema
+.DS_Store
+Thumbs.db
+
+# Configurações locais
+.env
+
+# IDE
+.vscode/
+.idea/

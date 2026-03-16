@@ -1,0 +1,28 @@
+{
+  "name": "ftp",
+  "version": "1.0.0",
+  "description": "",
+  "main": "client.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Nymeds/FTP.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Nymeds/FTP/issues"
+  },
+  "homepage": "https://github.com/Nymeds/FTP#readme",
+  "dependencies": {
+    "basic-ftp": "^5.2.0",
+    "express": "^5.2.1",
+    "ftp-srv": "^4.6.3",
+    "multer": "^2.1.1"
+  }
+}
