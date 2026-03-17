@@ -1,6 +1,6 @@
 # Servidor FTP com Interface Web
 Este projeto implementa um servidor FTP completo com uma interface web para gerenciamento de arquivos diretamente pelo navegador.
-![Texto alternativo](Captura de tela 2026-03-17 130114.png)
+![Texto alternativo](prints/img.png)
 A aplicação foi separada em duas partes independentes que se comunicam entre si:
 
 * Um servidor FTP real (Python + pyftpdlib)
