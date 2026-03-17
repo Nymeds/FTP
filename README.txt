@@ -38,6 +38,8 @@ FTP/
 
 ## Como executar
 
+NECESSARIO TER NODE E PYTHON PARA EXECUTAR
+
 ### 1. Instalar dependências do Node
 
 ```bash
