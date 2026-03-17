@@ -1,5 +1,3 @@
-// web.js - Interface melhorada (Tailwind CDN + CSS custom)
-// Mantive todas as funcionalidades: login, list, preview, raw, download, upload, mkdir, rename, delete
 const express = require("express");
 const ftp = require("basic-ftp");
 const multer = require("multer");
@@ -14,7 +12,7 @@ app.use(express.urlencoded({ extended: true }));
 
 let ftpConfig = null;
 
-// ─── Logger ───────────────────────────────────────────────────────────────────
+
 const LOG_FILE = path.join(__dirname, "web.log");
 function log(level, msg, extra = "") {
   const line = `[${new Date().toISOString()}] [${level}] ${msg}${extra ? " | " + extra : ""}`;
@@ -22,7 +20,6 @@ function log(level, msg, extra = "") {
   try { fs.appendFileSync(LOG_FILE, line + "\n"); } catch (e) {}
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 function formatBytes(bytes) {
   if (!bytes && bytes !== 0) return "";
   const sizes = ["B", "KB", "MB", "GB", "TB"];
@@ -71,7 +68,7 @@ function fileKind(ext) {
   return map[ext] || "file";
 }
 
-// ─── Template ─────────────────────────────────────────────────────────────────
+
 function page(contentHtml, note = "") {
   return `<!doctype html>
 <html>
@@ -203,7 +200,7 @@ async function ajaxUpload(dir){
 </html>`;
 }
 
-// ─── Rotas ────────────────────────────────────────────────────────────────────
+
 
 app.get("/", (req, res) => {
   const loginCard = `
@@ -460,7 +457,7 @@ app.post("/upload", upload.single("file"), async (req, res) => {
   }
 });
 
-// ─── Start ───────────────────────────────────────────────────────────────────
+
 app.listen(3000, () => {
   log("OK", "Web UI iniciada", "http://localhost:3000");
   log("INFO", `Log salvo em: ${LOG_FILE}`);
