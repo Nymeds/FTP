@@ -52,7 +52,10 @@ npm install
 ```bash
 pip install pyftpdlib
 ```
-
+ou
+```bash
+python -m pip install pyftpdlib
+```
 ### 3. Executar o servidor FTP
 
 ```bash
