@@ -177,3 +177,115 @@ Registra:
 ## Licença
 
 Uso livre para fins acadêmicos e estudo
+
+
+##  Comandos FTP: por que não usamos `CD`, `DIR`, `GET`, `PUT`?
+
+Embora comandos como `CD`, `DIR`, `GET` e `PUT` sejam comuns em clientes FTP (como terminal ou FileZilla), **eles não fazem parte do protocolo FTP oficial**.
+
+Esses comandos são apenas **atalhos (aliases)** criados por clientes para facilitar o uso humano.
+
+O protocolo FTP real (definido na RFC 959) utiliza comandos diferentes, mais específicos e padronizados.
+
+---
+
+##  Diferença fundamental
+
+| Tipo                          | Quem usa           | Exemplo               |
+| ----------------------------- | ------------------ | --------------------- |
+| Comando de cliente (atalho)   | Usuário humano     | `cd`, `dir`, `get`    |
+| Comando real do protocolo FTP | Cliente ↔ Servidor | `CWD`, `LIST`, `RETR` |
+
+ Ou seja:
+
+```
+cd pasta   → vira → CWD pasta
+dir        → vira → LIST
+get file   → vira → RETR file
+put file   → vira → STOR file
+```
+
+---
+
+##  Por que no código aparecem outros nomes?
+
+Neste projeto:
+
+* O servidor Python usa `pyftpdlib`
+* O backend Node usa `basic-ftp`
+
+Essas bibliotecas **não usam os atalhos**, elas trabalham diretamente com os comandos reais do protocolo FTP.
+
+Isso acontece porque:
+
+* Operam em nível mais próximo da rede
+* Seguem o padrão oficial
+* Evitam ambiguidades
+
+---
+
+##  Tabela de equivalência dos comandos
+
+| Comando "popular"          | Comando FTP real                 | Função                  |
+| -------------------------- | -------------------------------- | ----------------------- |
+| `cd`                       | `CWD` (Change Working Directory) | Mudar de diretório      |
+| `dir` / `ls`               | `LIST`                           | Listar arquivos         |
+| `get`                      | `RETR` (Retrieve)                | Baixar arquivo          |
+| `put`                      | `STOR` (Store)                   | Enviar arquivo          |
+| `mkdir`                    | `MKD`                            | Criar diretório         |
+| `rmdir`                    | `RMD`                            | Remover diretório       |
+| `delete`                   | `DELE`                           | Apagar arquivo          |
+| `rename`                   | `RNFR` + `RNTO`                  | Renomear arquivo        |
+| `pwd`                      | `PWD`                            | Mostrar diretório atual |
+| `binary` (`bin`)           | `TYPE I`                         | Modo binário            |
+| `ascii`                    | `TYPE A`                         | Modo texto              |
+| *(sem equivalente direto)* | `USER`                           | Informar usuário        |
+| *(sem equivalente direto)* | `PASS`                           | Informar senha          |
+| *(sem equivalente direto)* | `PASV`                           | Modo passivo            |
+| *(sem equivalente direto)* | `PORT`                           | Modo ativo              |
+
+---
+
+##  Exemplos reais capturados no servidor
+
+Com o sistema de logs implementado, é possível visualizar os comandos reais trafegando:
+
+```
+USER admin
+PASS ***
+CWD /arquivos
+LIST
+PASV
+RETR arquivo.txt
+STOR upload.txt
+```
+
+Isso mostra que:
+
+* O cliente pode usar `get`, mas o servidor recebe `RETR`
+* O cliente pode usar `put`, mas o servidor recebe `STOR`
+
+---
+
+##  Sobre `BIN` e `HASH`
+
+Alguns comandos vistos em clientes FTP não fazem parte diretamente do protocolo:
+
+| Comando          | Equivalente real                                     |
+| ---------------- | ---------------------------------------------------- |
+| `bin` / `binary` | `TYPE I`                                             |
+| `hash`           | Não existe no protocolo (apenas visual de progresso) |
+
+ O comando `HASH` não é enviado ao servidor — ele é apenas um recurso visual do cliente.
+
+---
+
+##  Conclusão
+
+O projeto utiliza os comandos reais do protocolo FTP porque:
+
+* Segue o padrão oficial
+* Utiliza bibliotecas que operam em nível de protocolo
+* Garante compatibilidade com qualquer cliente FTP
+
+Os comandos como `cd`, `get`, `put` são apenas abstrações criadas para facilitar o uso humano, mas não fazem parte da comunicação real entre cliente e servidor.

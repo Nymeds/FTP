@@ -1,4 +1,5 @@
-// web.js - Interface melhorada (Tailwind CDN, modais, progress, CRUD básico)
+// web.js - Interface melhorada (Tailwind CDN + CSS custom)
+// Mantive todas as funcionalidades: login, list, preview, raw, download, upload, mkdir, rename, delete
 const express = require("express");
 const ftp = require("basic-ftp");
 const multer = require("multer");
@@ -15,12 +16,10 @@ let ftpConfig = null;
 
 // ─── Logger ───────────────────────────────────────────────────────────────────
 const LOG_FILE = path.join(__dirname, "web.log");
-
 function log(level, msg, extra = "") {
-  const icons = { INFO: "ℹ️ ", WARN: "⚠️ ", ERROR: "❌", OK: "✅", EVENT: "📡" };
   const line = `[${new Date().toISOString()}] [${level}] ${msg}${extra ? " | " + extra : ""}`;
-  console.log(`${icons[level] || "  "} ${line}`);
-  fs.appendFileSync(LOG_FILE, line + "\n");
+  console.log(line);
+  try { fs.appendFileSync(LOG_FILE, line + "\n"); } catch (e) {}
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -53,10 +52,10 @@ async function connectFTP() {
 function breadcrumb(dir) {
   const parts = dir.split("/").filter(Boolean);
   let acc = "";
-  let html = `<a class="text-cyan-300" href="/files?dir=/">root</a>`;
+  let html = `<a class="text-cyan-400 hover:underline" href="/files?dir=/">root</a>`;
   parts.forEach((p) => {
     acc += "/" + p;
-    html += ` <span class="mx-2 text-slate-400">/</span> <a class="text-cyan-300" href="/files?dir=${encodeURIComponent(acc)}">${safe(p)}</a>`;
+    html += ` <span class="mx-2 text-slate-500">/</span> <a class="text-cyan-400 hover:underline" href="/files?dir=${encodeURIComponent(acc)}">${safe(p)}</a>`;
   });
   return html;
 }
@@ -82,31 +81,42 @@ function page(contentHtml, note = "") {
 <script src="https://cdn.tailwindcss.com"></script>
 <title>FTP Manager</title>
 <style>
-.thumb { width:100%; height:120px; object-fit:cover; border-radius:8px; background:#0b1220; display:block; }
-.card { transition: transform .08s ease, box-shadow .08s ease; }
-.card:hover{ transform: translateY(-6px); box-shadow: 0 12px 30px rgba(2,6,23,0.6); }
-pre.code{ background:#071026; color:#dff0ff; padding:12px; border-radius:8px; max-height:520px; overflow:auto; }
+  :root{
+    --bg-1: #071024;
+    --card: #0b1220;
+  }
+  body { background: linear-gradient(180deg,#071026 0%, #020617 100%); }
+  .thumb { width:100%; height:140px; object-fit:cover; border-radius:8px; background:linear-gradient(90deg,#020617,#0b1220); display:block; }
+  .card { transition: transform .12s ease, box-shadow .12s ease; }
+  .card:hover{ transform: translateY(-6px); box-shadow: 0 12px 30px rgba(2,6,23,0.6); }
+  .muted { color: #94a3b8 }
+  .small { font-size:0.85rem }
+  /* modal */
+  .modal-backdrop { background: rgba(0,0,0,0.7); }
 </style>
 </head>
-<body class="bg-slate-900 text-slate-100 min-h-screen">
-  <div class="max-w-6xl mx-auto p-6">
-    <header class="flex items-start justify-between gap-4 mb-6">
+<body class="text-slate-100 min-h-screen">
+  <div class="max-w-7xl mx-auto p-6">
+
+    <header class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-6">
       <div>
-        <h1 class="text-2xl font-semibold text-cyan-400">FTP Manager</h1>
-        <p class="text-sm text-slate-400">Conecte ao servidor e gerencie arquivos</p>
+        <h1 class="text-3xl font-semibold text-cyan-400">FTP Manager</h1>
+        <p class="muted small mt-1">Gerencie arquivos do servidor FTP pelo navegador</p>
       </div>
       <div class="text-sm text-right">
-        ${ftpConfig ? `<div class="text-slate-300">Server: ${safe(ftpConfig.host)}:${safe(ftpConfig.port)}</div><div class="text-slate-400">User: ${safe(ftpConfig.user)}</div>` : `<div class="text-slate-400">Não conectado</div>`}
+        ${ftpConfig ? `<div class="text-slate-300">Server: ${safe(ftpConfig.host)}:${safe(ftpConfig.port)}</div><div class="muted">User: ${safe(ftpConfig.user)}</div>` : `<div class="muted">Não conectado</div>`}
       </div>
     </header>
 
-    ${note ? `<div class="mb-4 p-3 rounded bg-amber-500 text-black">${safe(note)}</div>` : ""}
+    ${note ? `<div class="mb-4 p-3 rounded bg-red-600 text-white">${safe(note)}</div>` : ""}
 
     ${contentHtml}
+
   </div>
 
-  <div id="modal" class="hidden fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
-    <div class="bg-slate-800 w-full max-w-3xl rounded-lg overflow-auto">
+  <!-- Modal -->
+  <div id="modal" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4">
+    <div class="bg-slate-800 w-full max-w-4xl rounded-lg overflow-auto shadow-lg">
       <div class="flex justify-between items-center p-4 border-b border-slate-700">
         <div id="modalTitle" class="font-semibold"></div>
         <button onclick="closeModal()" class="px-3 py-1 rounded bg-slate-700 hover:bg-slate-600">Fechar</button>
@@ -135,31 +145,31 @@ async function showText(name,dir){
     const res = await fetch('/raw?file='+encodeURIComponent(name)+'&dir='+encodeURIComponent(dir));
     if(!res.ok) throw new Error('Erro');
     const txt = await res.text();
-    document.getElementById('modalBody').innerHTML = '<pre class="code">'+txt.replace(/</g,'&lt;')+'</pre>';
+    document.getElementById('modalBody').innerHTML = '<pre class="whitespace-pre-wrap text-sm" style="background:#071026;color:#dff0ff;padding:12px;border-radius:8px;max-height:520px;overflow:auto;">'+txt.replace(/</g,'&lt;')+'</pre>';
   }catch(e){
     document.getElementById('modalBody').innerHTML = '<div class="text-red-400">Erro ao carregar</div>';
   }
 }
 function confirmDelete(file, dir){
-  if(!confirm('Deletar "'+file+'" ?')) return;
+  if(!confirm('Deletar \"'+file+'\" ?')) return;
   const form = document.createElement('form');
   form.method='POST'; form.action='/delete';
   form.innerHTML = '<input type="hidden" name="dir" value="'+dir+'"><input type="hidden" name="file" value="'+file+'">';
   document.body.appendChild(form); form.submit();
 }
 function openRename(oldName, dir){
-  const html = '<form method="POST" action="/rename" class="space-y-2">'+
+  const html = '<form method="POST" action="/rename" class="space-y-2 p-2">'+
     '<input type="hidden" name="dir" value="'+dir+'">'+
     '<input type="hidden" name="oldName" value="'+oldName+'">'+
-    '<input name="newName" placeholder="Novo nome" class="w-full p-2 rounded bg-slate-700" />'+
+    '<input name="newName" placeholder="Novo nome" class="w-full p-2 rounded bg-slate-700 text-sm" />'+
     '<div class="flex justify-end gap-2"><button type="button" onclick="closeModal()" class="px-3 py-1 rounded bg-slate-700">Cancelar</button><button class="px-3 py-1 rounded bg-yellow-500">Renomear</button></div>'+
     '</form>';
   openModal('Renomear: '+oldName, html);
 }
 function openMkdir(dir){
-  const html = '<form method="POST" action="/mkdir" class="space-y-2">'+
+  const html = '<form method="POST" action="/mkdir" class="space-y-2 p-2">'+
     '<input type="hidden" name="dir" value="'+dir+'">'+
-    '<input name="name" placeholder="Nome da pasta" class="w-full p-2 rounded bg-slate-700" />'+
+    '<input name="name" placeholder="Nome da pasta" class="w-full p-2 rounded bg-slate-700 text-sm" />'+
     '<div class="flex justify-end gap-2"><button type="button" onclick="closeModal()" class="px-3 py-1 rounded bg-slate-700">Cancelar</button><button class="px-3 py-1 rounded bg-cyan-500">Criar</button></div>'+
     '</form>';
   openModal('Criar Pasta', html);
@@ -197,22 +207,46 @@ async function ajaxUpload(dir){
 
 app.get("/", (req, res) => {
   const loginCard = `
-    <div class="bg-slate-800 p-6 rounded max-w-md">
-      <form method="POST" action="/login" class="space-y-3">
-        <div><label class="text-sm text-slate-300">Host</label><input name="host" value="127.0.0.1" class="w-full mt-1 p-2 rounded bg-slate-700" /></div>
-        <div><label class="text-sm text-slate-300">Porta</label><input name="port" value="2121" class="w-full mt-1 p-2 rounded bg-slate-700" /></div>
-        <div><label class="text-sm text-slate-300">Usuário</label><input name="user" class="w-full mt-1 p-2 rounded bg-slate-700" /></div>
-        <div><label class="text-sm text-slate-300">Senha</label><input type="password" name="password" class="w-full mt-1 p-2 rounded bg-slate-700" /></div>
-        <div class="pt-2"><button class="w-full bg-cyan-500 hover:bg-cyan-600 p-2 rounded font-semibold">Conectar</button></div>
+    <div class="max-w-md mx-auto">
+      <form method="POST" action="/login" class="bg-slate-800 p-6 rounded shadow-lg space-y-4">
+        <div>
+          <label class="text-sm muted">Host</label>
+          <input name="host" value="127.0.0.1" class="w-full mt-1 p-2 rounded bg-slate-700" />
+        </div>
+        <div>
+          <label class="text-sm muted">Porta</label>
+          <input name="port" value="21" class="w-full mt-1 p-2 rounded bg-slate-700" />
+        </div>
+        <div>
+          <label class="text-sm muted">Usuário</label>
+          <input name="user" class="w-full mt-1 p-2 rounded bg-slate-700" />
+        </div>
+        <div>
+          <label class="text-sm muted">Senha</label>
+          <input type="password" name="password" class="w-full mt-1 p-2 rounded bg-slate-700" />
+        </div>
+        <div class="pt-2">
+          <button class="w-full bg-cyan-500 hover:bg-cyan-600 p-2 rounded font-semibold">Conectar</button>
+        </div>
       </form>
     </div>`;
   res.send(page(loginCard));
 });
 
-app.post("/login", (req, res) => {
+app.post("/login", async (req, res) => {
   ftpConfig = req.body;
   log("EVENT", "Login via web", `user="${ftpConfig.user}" server=${ftpConfig.host}:${ftpConfig.port}`);
-  res.redirect("/files?dir=/");
+
+  // tenta conectar antes de aceitar
+  try {
+    const client = await connectFTP();
+    await client.close();
+    res.redirect("/files?dir=/");
+  } catch (err) {
+    log("ERROR", "Falha no login", err.message);
+    ftpConfig = null;
+    res.send(page("", "Não foi possível conectar ao servidor FTP. Verifique host, porta, usuário e senha."));
+  }
 });
 
 app.get("/files", async (req, res) => {
@@ -225,29 +259,31 @@ app.get("/files", async (req, res) => {
     const list = await client.list();
     log("INFO", "Listagem de pasta", `dir="${dir}" itens=${list.length}`);
 
-    let content = `<div class="mb-4 text-sm text-slate-400">Navegação: ${breadcrumb(dir)}</div>`;
+    let content = `<div class="mb-4 text-sm muted">Navegação: ${breadcrumb(dir)}</div>`;
 
     content += `
-      <div class="flex gap-3 items-center mb-4">
-        <button onclick="openMkdir('${dir}')" class="px-3 py-2 bg-slate-700 rounded">Nova pasta</button>
-        <div class="flex items-center gap-2 bg-slate-800 p-2 rounded">
-          <input id="fileInput" type="file" class="text-sm" />
-          <button onclick="ajaxUpload('${dir}')" class="px-3 py-2 bg-green-500 rounded">Upload</button>
+      <div class="flex flex-col md:flex-row gap-3 items-start md:items-center mb-4">
+        <div class="flex gap-2">
+          <button onclick="openMkdir('${dir}')" class="px-3 py-2 bg-slate-700 rounded">Nova pasta</button>
+          <label class="px-3 py-2 bg-slate-700 rounded cursor-pointer">
+            <input id="fileInput" type="file" class="hidden" />
+            Upload
+          </label>
+          <button onclick="ajaxUpload('${dir}')" class="px-3 py-2 bg-green-500 rounded">Enviar</button>
         </div>
-        <div class="flex-1">
-          <div id="uploadWrap" class="hidden bg-slate-800 rounded overflow-hidden mt-2">
-            <div class="h-2 bg-slate-700"><div id="uploadBar" style="width:0%; height:100%; background:#06b6d4;"></div></div>
-          </div>
-        </div>
+        <div class="flex-1"></div>
+        <div class="text-sm muted">Server: ${safe(ftpConfig.host)}:${safe(ftpConfig.port)}</div>
       </div>`;
 
-    content += `<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">`;
+    content += `<div id="uploadWrap" class="hidden bg-slate-800 rounded overflow-hidden mb-4"><div class="h-2 bg-slate-700"><div id="uploadBar" style="width:0%; height:100%; background:#06b6d4;"></div></div></div>`;
+
+    content += `<div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">`;
 
     for (const f of list) {
       if (f.isDirectory) {
         content += `
-          <div class="card p-3 bg-slate-800 rounded">
-            <div class="text-3xl text-slate-300 mb-3">📁</div>
+          <div class="card p-4 bg-slate-800 rounded">
+            <div class="text-2xl text-slate-300 mb-3">📁</div>
             <div class="font-medium break-all">${safe(f.name)}</div>
             <div class="mt-3 flex gap-2">
               <a href="/files?dir=${encodeURIComponent((dir === "/" ? "" : dir) + "/" + f.name)}" class="px-3 py-1 bg-cyan-600 rounded text-sm">Abrir</a>
@@ -259,10 +295,10 @@ app.get("/files", async (req, res) => {
         const kind = fileKind(ext);
         const isImage = ["png","jpg","jpeg","gif","webp"].includes(ext);
         content += `
-          <div class="card p-3 bg-slate-800 rounded flex flex-col">
-            <div class="mb-3 ${isImage ? "" : "text-4xl text-slate-300"}">
+          <div class="card p-4 bg-slate-800 rounded flex flex-col">
+            <div class="mb-3 ${isImage ? '' : 'text-4xl text-slate-300'}">
               ${isImage
-                ? `<img class="thumb" src="/preview?file=${encodeURIComponent(f.name)}&dir=${encodeURIComponent(dir)}" />`
+                ? `<img class="thumb rounded" src="/preview?file=${encodeURIComponent(f.name)}&dir=${encodeURIComponent(dir)}" />`
                 : (kind === "code" ? '<div class="text-slate-300">&lt;/&gt;</div>' : (kind === "text" ? '<div class="text-slate-300">📄</div>' : '<div class="text-slate-300">📦</div>'))}
             </div>
             <div class="flex-1">
@@ -424,7 +460,7 @@ app.post("/upload", upload.single("file"), async (req, res) => {
   }
 });
 
-// ─── Start ────────────────────────────────────────────────────────────────────
+// ─── Start ───────────────────────────────────────────────────────────────────
 app.listen(3000, () => {
   log("OK", "Web UI iniciada", "http://localhost:3000");
   log("INFO", `Log salvo em: ${LOG_FILE}`);
