@@ -1,6 +1,9 @@
 # Servidor FTP com Interface Web
+
 Este projeto implementa um servidor FTP completo com uma interface web para gerenciamento de arquivos diretamente pelo navegador.
-![Texto alternativo](prints/img.png)
+
+![Interface](prints/img.png)
+
 A aplicação foi separada em duas partes independentes que se comunicam entre si:
 
 * Um servidor FTP real (Python + pyftpdlib)
@@ -17,7 +20,6 @@ O fluxo da aplicação é o seguinte:
 Navegador → HTTP → web.js → FTP → servidor Python → arquivos no disco
 
 O navegador não entende FTP. Por isso, o backend em Node.js recebe requisições HTTP e executa operações FTP usando a biblioteca `basic-ftp`.
-
 ---
 
 ## Estrutura do projeto
