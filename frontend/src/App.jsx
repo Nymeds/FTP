@@ -389,11 +389,17 @@ function FileRow({ currentDir, entry, onDelete, onNavigate, onPreview, onRename 
           {isImageEntry(entry) ? (
             <img className="file-thumb" src={previewUrl} alt={entry.name} loading="lazy" />
           ) : icon === "folder" ? (
-            <span className="file-mark">DIR</span>
+            <span className="file-mark" aria-hidden="true">
+              {"\u{1F4C1}"}
+            </span>
           ) : icon === "text" ? (
-            <span className="file-mark">TXT</span>
+            <span className="file-mark" aria-hidden="true">
+              {"\u{1F4C4}"}
+            </span>
           ) : (
-            <span className="file-mark">FILE</span>
+            <span className="file-mark" aria-hidden="true">
+              {"\u{1F4E6}"}
+            </span>
           )}
         </span>
         <button className="name-button" type="button" onClick={() => (entry.isDirectory ? onNavigate(entry.path) : canPreview(entry) ? onPreview(entry) : null)}>
