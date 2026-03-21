@@ -77,6 +77,10 @@ function canPreview(entry) {
   return IMAGE_EXTENSIONS.includes(entry.extension) || TEXT_EXTENSIONS.includes(entry.extension);
 }
 
+function isImageEntry(entry) {
+  return IMAGE_EXTENSIONS.includes(entry.extension);
+}
+
 function entryIcon(entry) {
   if (entry.isDirectory) {
     return "folder";
@@ -195,15 +199,15 @@ function Sidebar({
   busyMessage,
   currentDir,
   onDisconnect,
+  onOpenFilePicker,
   onQueueFiles,
   onUpload,
   pendingFiles,
   session,
   uploadProgress,
   stats,
+  fileInputRef,
 }) {
-  const fileInputRef = useRef(null);
-
   return (
     <aside className="sidebar">
       <section className="panel sidebar-section">
@@ -259,7 +263,7 @@ function Sidebar({
         />
 
         <div className="action-column">
-          <button className="ghost-button full-width" type="button" onClick={() => fileInputRef.current?.click()}>
+          <button className="ghost-button full-width" type="button" onClick={onOpenFilePicker}>
             Selecionar arquivos
           </button>
           <button className="primary-button full-width" type="button" onClick={onUpload} disabled={!pendingFiles.length}>
@@ -376,11 +380,22 @@ function Explorer({
 function FileRow({ currentDir, entry, onDelete, onNavigate, onPreview, onRename }) {
   const kind = entry.isDirectory ? "Pasta" : "Arquivo";
   const icon = entryIcon(entry);
+  const previewUrl = `/api/files/preview?dir=${encodeURIComponent(currentDir)}&name=${encodeURIComponent(entry.name)}`;
 
   return (
     <div className="table-row">
       <div className="name-cell">
-        <span className={cls("file-icon", icon)}>{icon === "folder" ? "📁" : icon === "image" ? "🖼" : icon === "text" ? "📄" : "📦"}</span>
+        <span className={cls("file-icon", icon)}>
+          {isImageEntry(entry) ? (
+            <img className="file-thumb" src={previewUrl} alt={entry.name} loading="lazy" />
+          ) : icon === "folder" ? (
+            <span className="file-mark">DIR</span>
+          ) : icon === "text" ? (
+            <span className="file-mark">TXT</span>
+          ) : (
+            <span className="file-mark">FILE</span>
+          )}
+        </span>
         <button className="name-button" type="button" onClick={() => (entry.isDirectory ? onNavigate(entry.path) : canPreview(entry) ? onPreview(entry) : null)}>
           {entry.name}
         </button>
@@ -544,6 +559,15 @@ function Toasts({ toasts, onDismiss }) {
   );
 }
 
+function FloatingUploadButton({ count, onClick }) {
+  return (
+    <button className="floating-upload-button" type="button" onClick={onClick} aria-label="Adicionar arquivos">
+      <span className="floating-upload-plus">+</span>
+      {count ? <span className="floating-upload-count">{count}</span> : null}
+    </button>
+  );
+}
+
 export default function App() {
   const [meta, setMeta] = useState(null);
   const [connectionForm, setConnectionForm] = useState({
@@ -564,6 +588,7 @@ export default function App() {
   const [modal, setModal] = useState(null);
   const [toasts, setToasts] = useState([]);
   const toastCounter = useRef(0);
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     let active = true;
@@ -850,6 +875,10 @@ export default function App() {
     filtered: filteredEntries.length,
   };
 
+  function openFilePicker() {
+    fileInputRef.current?.click();
+  }
+
   return (
     <div className="page-shell">
       <div className="page-glow page-glow-left" />
@@ -885,12 +914,14 @@ export default function App() {
               busyMessage={busyMessage}
               currentDir={currentDir}
               onDisconnect={handleDisconnect}
+              onOpenFilePicker={openFilePicker}
               onQueueFiles={queueFiles}
               onUpload={uploadPendingFiles}
               pendingFiles={pendingFiles}
               session={session}
               stats={stats}
               uploadProgress={uploadProgress}
+              fileInputRef={fileInputRef}
             />
 
             <Explorer
@@ -907,6 +938,8 @@ export default function App() {
               search={search}
             />
           </div>
+
+          <FloatingUploadButton count={pendingFiles.length} onClick={openFilePicker} />
         </div>
       )}
 

@@ -527,6 +527,7 @@ a {
   border-radius: 12px;
   background: rgba(56, 189, 248, 0.1);
   flex-shrink: 0;
+  overflow: hidden;
 }
 
 .file-icon.folder {
@@ -539,6 +540,20 @@ a {
 
 .file-icon.text {
   background: rgba(245, 158, 11, 0.12);
+}
+
+.file-mark {
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--text);
+}
+
+.file-thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
 
 .name-button {
@@ -589,6 +604,51 @@ a {
 
 .hidden-input {
   display: none;
+}
+
+.floating-upload-button {
+  position: fixed;
+  left: 24px;
+  bottom: 24px;
+  z-index: 18;
+  width: 62px;
+  height: 62px;
+  border-radius: 20px;
+  border: 1px solid rgba(56, 189, 248, 0.28);
+  background: linear-gradient(135deg, rgba(56, 189, 248, 0.96), rgba(14, 165, 233, 0.96));
+  color: #03111d;
+  box-shadow: 0 22px 50px rgba(2, 8, 23, 0.45);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease;
+}
+
+.floating-upload-button:hover {
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 0 26px 56px rgba(2, 8, 23, 0.52);
+}
+
+.floating-upload-plus {
+  display: block;
+  font-size: 2rem;
+  line-height: 1;
+  font-weight: 300;
+}
+
+.floating-upload-count {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: #f8fafc;
+  color: #03111d;
+  font-size: 0.76rem;
+  font-weight: 700;
+  border: 2px solid rgba(3, 17, 29, 0.9);
 }
 
 .modal-overlay {
@@ -732,5 +792,13 @@ a {
   .login-hint-grid,
   .metric-grid {
     grid-template-columns: 1fr;
+  }
+
+  .floating-upload-button {
+    left: 16px;
+    bottom: 16px;
+    width: 58px;
+    height: 58px;
+    border-radius: 18px;
   }
 }
