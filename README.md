@@ -54,7 +54,110 @@ Campos principais:
 - `FTP_PORT`: porta do servidor FTP/FTPS
 - `FTPS_ENABLED`: ativa a criptografia TLS
 
-As mesmas explicacoes tambem foram deixadas comentadas em `.env` e `.env.example`.
+Os arquivos [`.env`](/c:/Users/morai/Downloads/FTP/.env) e [`.env.example`](/c:/Users/morai/Downloads/FTP/.env.example) agora ficaram enxutos, contendo apenas as variaveis de configuracao.
+
+## Como o .env funciona
+
+O `.env` centraliza as configuracoes do projeto. Tanto o backend Node em [backend/web.js](/c:/Users/morai/Downloads/FTP/backend/web.js) quanto o servidor Python em [backend/server.py](/c:/Users/morai/Downloads/FTP/backend/server.py) leem essas variaveis na inicializacao, evitando alterar valores direto no codigo.
+
+Fluxo pratico:
+
+- o React envia requisicoes HTTP para a API Node
+- a API Node usa os dados do `.env` como padrao de conexao
+- o servidor Python sobe o servico FTP/FTPS com essas mesmas configuracoes
+- se voce mudar usuario, senha, porta ou FTPS, precisa reiniciar `npm run start:ftp` e `npm start`
+
+Variaveis principais:
+
+- `FTP_HOST`: endereco do servidor FTP/FTPS
+- `FTP_PORT`: porta do servidor, neste projeto configurada para `21`
+- `FTP_ADMIN_NAME`: usuario administrador padrao
+- `FTP_ADMIN_PASSWORD`: senha do administrador
+- `FTPS_ENABLED`: ativa ou desativa criptografia TLS
+- `FTP_PASSIVE_START` e `FTP_PASSIVE_END`: faixa de portas usada no modo passivo
+- `WEB_PORT`: porta da interface web/API
+
+## Fluxo da aplicacao
+
+Arquitetura geral:
+
+- Frontend React: interface visual usada pelo usuario
+- Backend Node: API HTTP e cliente FTP/FTPS
+- Backend Python: servidor FTP/FTPS real
+- `backend/arquivos/`: diretorio base onde os arquivos ficam armazenados
+
+Fluxo de uma acao:
+
+1. o usuario clica em uma acao no frontend
+2. o frontend chama uma rota HTTP do Node
+3. o Node valida sessao e dados recebidos
+4. o Node abre uma conexao FTP/FTPS com o Python
+5. o Python executa a operacao no sistema de arquivos
+6. o resultado volta para o Node e depois para o navegador
+
+## Por que cada rota faz openFtpClient(...)
+
+Trecho importante em [backend/web.js](/c:/Users/morai/Downloads/FTP/backend/web.js):
+
+```js
+client = await openFtpClient(req.ftpSession.config);
+```
+
+Isso acontece em cada rota protegida porque o navegador nao fala FTP direto, ele fala HTTP com o Node. Como HTTP e stateless, cada requisicao chega separada. O Node salva apenas a configuracao da sessao em `req.ftpSession.config` e, quando uma operacao precisa acontecer, abre uma nova conexao FTP/FTPS para aquela acao.
+
+Essa decisao foi mantida por alguns motivos tecnicos:
+
+- evita reaproveitar um socket FTP unico entre varias rotas diferentes
+- reduz problemas com conexoes antigas, expirada ou quebradas
+- combina melhor com o modelo de requisicoes independentes do HTTP
+- facilita tratar erro por operacao, como falha de upload ou de listagem
+- funciona melhor com a biblioteca `basic-ftp`, que trabalha bem com conexoes curtas e controladas
+
+Comportamento padrao:
+
+- o login valida credenciais abrindo uma conexao FTP/FTPS
+- se a autenticacao funcionar, a configuracao fica salva na sessao HTTP
+- cada rota reabre uma conexao usando essa configuracao salva
+- ao final, `client.close()` encerra a conexao da operacao atual
+
+## Pontos importantes para o relatorio
+
+Sobre o protocolo FTP:
+
+- FTP significa `File Transfer Protocol`
+- ele foi criado para transferencia de arquivos em rede
+- usa dois canais: controle para comandos e autenticacao, e dados para listagens e arquivos
+
+Sobre o modo passivo:
+
+- no modo passivo, o servidor informa uma porta de dados para a transferencia
+- esse modo costuma funcionar melhor com firewall e NAT
+- por isso o projeto define `FTP_PASSIVE_START` e `FTP_PASSIVE_END`
+
+Sobre seguranca:
+
+- FTP puro nao criptografa usuario, senha nem conteudo trafegado
+- isso torna o protocolo inseguro em cenarios reais
+- por isso o projeto implementa FTPS, que adiciona TLS ao FTP
+
+Diferenca entre FTP, FTPS e SFTP:
+
+- FTP: protocolo tradicional sem criptografia nativa
+- FTPS: FTP com TLS/SSL
+- SFTP: protocolo diferente, baseado em SSH
+
+Papel de cada camada no projeto:
+
+- Python: servidor FTP/FTPS
+- Node: API web e cliente FTP/FTPS
+- React: interface de gerenciamento de arquivos
+
+Justificativa tecnica da arquitetura:
+
+- separar frontend, API e servidor FTP facilita manutencao e organizacao
+- usar `.env` permite trocar credenciais e portas sem alterar o codigo
+- usar FTPS melhora a seguranca em relacao ao FTP puro
+- reabrir conexao FTP em cada rota deixa o backend mais estavel
 
 ## Guia de acoes e metodos
 
