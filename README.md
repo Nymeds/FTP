@@ -1,298 +1,182 @@
-# Servidor FTP com Interface Web
+# FTP Lab Manager
 
-Este projeto implementa um servidor FTP completo com uma interface web para gerenciamento de arquivos diretamente pelo navegador.
+Projeto academico com servidor FTP/FTPS em Python, API em Node.js e interface React para gerenciamento de arquivos.
 
-![Interface](prints/img.png)
+## O que foi implementado
 
-A aplicação foi separada em duas partes independentes que se comunicam entre si:
+- autenticacao por usuario e senha
+- listagem de arquivos e diretorios
+- upload e download
+- criacao, renomeacao e exclusao de itens
+- interface web estilo gerenciador de arquivos
+- criptografia com **FTPS explicito (TLS)**
+- configuracao centralizada por `.env`
 
-* Um servidor FTP real (Python + pyftpdlib)
-* Uma interface web (Node.js + Express)
+## Estrutura
 
-A interface web atua como intermediária, traduzindo ações do usuário em comandos FTP.
-
----
-
-## Como funciona
-
-O fluxo da aplicação é o seguinte:
-
-Navegador → HTTP → web.js → FTP → servidor Python → arquivos no disco
-
-O navegador não entende FTP. Por isso, o backend em Node.js recebe requisições HTTP e executa operações FTP usando a biblioteca `basic-ftp`.
----
-
-## Estrutura do projeto
-
-```
+```text
 FTP/
-├── web.js              # Interface web (Node.js)
-├── server.py           # Servidor FTP (Python)
-├── arquivos/           # Diretório raiz dos arquivos
-├── uploads/            # Arquivos temporários de upload
-├── web.log             # Log da interface web
-├── ftp-server.log      # Log do servidor FTP
-└── package.json
+|- backend/
+|  |- arquivos/
+|  |- uploads/
+|  |- certs/                  # certificado FTPS gerado automaticamente
+|  |- server.py               # servidor Python
+|  |- web.js                  # backend em node
+|  |- load_env.py             # charger envs
+|  |- loadEnv.js
+|- frontend/
+|  |- src/
+|  |- dist/
+|  |- index.html
+|  |- vite.config.mjs
+|- .env
+|- .env.example
+|- package.json
 ```
 
----
+## Configuracao por .env
 
-## Como executar
+```env
+FTP_HOST=127.0.0.1
+FTP_PORT=21
+FTP_ADMIN_NAME=admin
+FTP_ADMIN_PASSWORD=123
+FTPS_ENABLED=true
+FTP_PASSIVE_START=30000
+FTP_PASSIVE_END=30010
+WEB_PORT=3000
+```
 
-NECESSARIO TER NODE E PYTHON PARA EXECUTAR
+Campos principais:
 
-### 1. Instalar dependências do Node
+- `FTP_ADMIN_NAME`: usuario administrador do sistema
+- `FTP_ADMIN_PASSWORD`: senha do administrador
+- `FTP_PORT`: porta do servidor FTP/FTPS
+- `FTPS_ENABLED`: ativa a criptografia TLS
+
+As mesmas explicacoes tambem foram deixadas comentadas em `.env` e `.env.example`.
+
+## Guia de acoes e metodos
+
+Tabela pensada para facilitar 
+
+| Acao | Node: rota | Node: funcao/fluxo principal | Node: chamada da lib FTP | Python: funcao/handler que recebe | O que acontece no Python | Onde olhar em caso de erro |
+| --- | --- | --- | --- | --- | --- | --- |
+| Login no servidor | `POST /api/session/connect` | `sanitizeConnectionPayload` -> `openFtpClient` -> `createSession` | `client.access(...)` | `on_connect`, `on_login`, `on_login_failed` em `CustomFTPHandler` / `CustomTLSFTPHandler` | aceita ou recusa a autenticacao e registra no log | `sendApiError`, `log("ERROR", "Falha ao conectar no FTP", ...)`, credenciais no `.env`, FTPS/TLS |
+| Encerrar sessao | `DELETE /api/session` | `destroySession` | sem comando FTP direto | `on_disconnect` | fecha a conexao do cliente | cookie/sessao em `destroySession` e `getSession` |
+| Listar arquivos e diretorios | `GET /api/files` | `requireSession` -> `normalizeRemoteDir` -> `openFtpClient` | `client.cd(dir)` + `client.list()` + `client.pwd()` | `on_cwd`, `on_list` | muda para o diretorio e faz a listagem | `Falha na listagem FTP`, caminho invalido, sessao expirada |
+| Criar pasta | `POST /api/files/folder` | `sanitizeRemoteName` -> `buildRemotePath` | `client.ensureDir(targetPath)` | `on_mkd` | cria o diretorio remoto | `Falha ao criar pasta`, nome invalido ou permissao |
+| Renomear item | `PATCH /api/files/rename` | `sanitizeRemoteName` -> `buildRemotePath` | `client.rename(oldPath, newPath)` | `on_rename` | renomeia arquivo ou pasta | `Falha ao renomear item`, nome repetido ou caminho invalido |
+| Excluir arquivo | `DELETE /api/files/item?type=file` | `sanitizeRemoteName` -> `buildRemotePath` | `client.remove(targetPath)` | `on_file_removed` | remove o arquivo remoto | `Falha ao remover item`, arquivo inexistente ou permissao |
+| Excluir pasta | `DELETE /api/files/item?type=directory` | `sanitizeRemoteName` -> `buildRemotePath` | `client.removeDir(targetPath)` | `on_rmd` | remove o diretorio remoto | `Falha ao remover item`, pasta nao vazia ou permissao |
+| Enviar imagem/arquivo | `POST /api/files/upload` | `upload.array("files")` -> `openFtpClient` | `client.cd(dir)` + `client.uploadFrom(file.path, file.originalname)` | `on_file_received`, `on_incomplete_file_received` | recebe o arquivo e salva na pasta FTP | limite do `multer`, `Falha no upload`, arquivo temporario em `backend/uploads/` |
+| Baixar arquivo | `GET /api/files/download` | `sanitizeRemoteName` -> `inferMimeType` | `client.cd(dir)` + `client.downloadTo(res, name)` | `on_file_sent`, `on_incomplete_file_sent` | envia o arquivo para o Node, que repassa ao navegador | `Falha no download`, nome invalido, arquivo inexistente |
+| Preview de imagem | `GET /api/files/preview` | `sanitizeRemoteName` -> `inferMimeType` | `client.cd(dir)` + `client.downloadTo(res, name)` | `on_file_sent`, `on_incomplete_file_sent` | envia o arquivo para visualizacao no navegador | `Falha no preview`, nome invalido ou arquivo inexistente |
+| Preview de texto | `GET /api/files/text` | `sanitizeRemoteName` -> `collectTextFromRemoteFile` | `client.cd(dir)` + `client.downloadTo(writable, name)` | `on_file_sent`, `on_incomplete_file_sent` | baixa o conteudo do arquivo e o Node devolve como texto | `Falha ao ler arquivo de texto`, encoding ou arquivo nao encontrado |
+
+## Funcoes-chave para procurar no codigo
+
+### Node (`backend/web.js`)
+
+- `openFtpClient`: abre a conexao FTPS/FTP com o servidor Python
+- `requireSession`: bloqueia rotas sem login
+- `sanitizeConnectionPayload`: normaliza credenciais recebidas
+- `normalizeRemoteDir`: padroniza diretorios remotos
+- `sanitizeRemoteName`: valida nomes de arquivo e pasta
+- `buildRemotePath`: monta caminhos remotos
+- `collectTextFromRemoteFile`: usado no preview de texto
+- `sendApiError`: resposta padrao de erro da API
+- `upload.array("files")`: middleware que recebe os uploads HTTP
+
+### Python (`backend/server.py`)
+
+- `ensure_self_signed_certificate`: gera o certificado FTPS
+- `build_server`: cria o servidor FTP/FTPS e registra o usuario admin
+- `CustomFTPHandler`: eventos gerais do FTP
+- `CustomTLSFTPHandler`: versao com criptografia FTPS
+- `on_connect`: conexao iniciada
+- `on_login` / `on_login_failed`: autenticacao
+- `on_list`: listagem de diretorio
+- `on_file_received`: upload recebido
+- `on_file_sent`: download/preview enviado
+- `on_mkd`: criacao de pasta
+- `on_rename`: renomeacao
+- `on_file_removed` / `on_rmd`: exclusao
+
+## Criptografia
+
+O servidor usa  **FTPS explicito (TLS)**:
+
+- canal de controle protegido
+- canal de dados protegido
+- certificado autoassinado gerado automaticamente em `backend/certs/`
+
+## Porta 21
+
+O servidor esta configurado para rodar na porta `21` via `.env`.
+
+Se o sistema operacional exigir permissao elevada para essa porta, execute o terminal com privilegio de administrador. Ou alterne para a porta comum da lib 2121
+
+## Instalacao
+- Necessario Node.js
+- Necessario Python
+
+### 1. Instalar dependencias Node.js
 
 ```bash
 npm install
 ```
 
-### 2. Instalar dependências do Python
+### 2. Instalar dependencias Python
 
 ```bash
-pip install pyftpdlib
+python -m pip install pyftpdlib pyOpenSSL
 ```
-ou
-```bash
-python -m pip install pyftpdlib
-```
-### 3. Executar o servidor FTP
+
+### 3. Buildar o frontend
 
 ```bash
-python server.py
+npm run build
 ```
 
-### 4. Executar a interface web
+## Execucao
+
+### Iniciar o servidor FTP/FTPS
 
 ```bash
-node web.js
+npm run start:ftp
 ```
 
-### 5. Acessar no navegador
+### Iniciar a API e interface web
 
+```bash
+npm start
 ```
+
+### Abrir no navegador
+
+```text
 http://localhost:3000
 ```
 
----
+## Credenciais padrao
 
-## Credenciais padrão
-
-```
-Host:    127.0.0.1
-Porta:   21
-Usuário: admin
+```text
+Usuario: admin
 Senha:   123
+Porta:   21
 ```
 
----
+## Observacao final
 
-## Funcionalidades
+Se alterar o frontend:
 
-* Upload de arquivos com barra de progresso
-* Download de arquivos
-* Visualização de imagens no navegador
-* Visualização de arquivos de texto
-* Criação de pastas
-* Renomeação de arquivos e diretórios
-* Exclusão de arquivos
-* Navegação entre pastas
-* Logs detalhados de todas as operações
-
----
-
-
-## Comportamento das operações
-
-### Upload
-
-O arquivo é enviado via HTTP, salvo temporariamente e depois transferido para o servidor FTP.
-
-### Download
-
-O arquivo é transmitido diretamente do servidor FTP para o navegador via stream.
-
-### Listagem
-
-Cada acesso a uma pasta executa um comando LIST no servidor FTP.
-
-### Renomeação
-
-Utiliza os comandos FTP RNFR e RNTO.
-
-### Exclusão
-
-Executa o comando DELE no servidor FTP.
-
----
-
-## Logs
-
-### Interface web
-
-Arquivo: `web.log`
-
-Registra ações como:
-
-* Upload
-* Download
-* Erros
-* Navegação
-
-### Servidor FTP
-
-Arquivo: `ftp-server.log`
-
-Registra:
-
-* Conexões
-* Logins
-* Transferências
-* Erros
-
----
-
-## Observações importantes
-
-* O sistema é voltado para uso local
-* Não há autenticação segura (não usar em produção)
-* A sessão FTP não é persistente
-* O servidor FTP utiliza modo passivo nas portas 3000 a 3010
-
----
-
-## Melhorias implementadas
-
-* Interface com Tailwind mais organizada
-* Modal para ações (renomear, criar pasta)
-* Barra de progresso no upload
-* Preview de arquivos
-* Tratamento de erros mais claro
-
----
-
-## Possíveis melhorias futuras
-
-* Autenticação real com sessão
-* Upload múltiplo
-* Drag and drop
-* Suporte a HTTPS
-* Controle de permissões por usuário
-
----
-
-## Licença
-
-Uso livre para fins acadêmicos e estudo
-
-
-##  Comandos FTP: por que não usamos `CD`, `DIR`, `GET`, `PUT`?
-
-Embora comandos como `CD`, `DIR`, `GET` e `PUT` sejam comuns em clientes FTP (como terminal ou FileZilla), **eles não fazem parte do protocolo FTP oficial**.
-
-Esses comandos são apenas **atalhos (aliases)** criados por clientes para facilitar o uso humano.
-
-O protocolo FTP real (definido na RFC 959) utiliza comandos diferentes, mais específicos e padronizados.
-
----
-
-##  Diferença fundamental
-
-| Tipo                          | Quem usa           | Exemplo               |
-| ----------------------------- | ------------------ | --------------------- |
-| Comando de cliente (atalho)   | Usuário humano     | `cd`, `dir`, `get`    |
-| Comando real do protocolo FTP | Cliente ↔ Servidor | `CWD`, `LIST`, `RETR` |
-
- Ou seja:
-
-```
-cd pasta   → vira → CWD pasta
-dir        → vira → LIST
-get file   → vira → RETR file
-put file   → vira → STOR file
+```bash
+npm run build
 ```
 
----
+Se alterar usuario, senha ou porta:
 
-##  Por que no código aparecem outros nomes?
-
-Neste projeto:
-
-* O servidor Python usa `pyftpdlib`
-* O backend Node usa `basic-ftp`
-
-Essas bibliotecas **não usam os atalhos**, elas trabalham diretamente com os comandos reais do protocolo FTP.
-
-Isso acontece porque:
-
-* Operam em nível mais próximo da rede
-* Seguem o padrão oficial
-* Evitam ambiguidades
-
----
-
-##  Tabela de equivalência dos comandos
-
-| Comando "popular"          | Comando FTP real                 | Função                  |
-| -------------------------- | -------------------------------- | ----------------------- |
-| `cd`                       | `CWD` (Change Working Directory) | Mudar de diretório      |
-| `dir` / `ls`               | `LIST`                           | Listar arquivos         |
-| `get`                      | `RETR` (Retrieve)                | Baixar arquivo          |
-| `put`                      | `STOR` (Store)                   | Enviar arquivo          |
-| `mkdir`                    | `MKD`                            | Criar diretório         |
-| `rmdir`                    | `RMD`                            | Remover diretório       |
-| `delete`                   | `DELE`                           | Apagar arquivo          |
-| `rename`                   | `RNFR` + `RNTO`                  | Renomear arquivo        |
-| `pwd`                      | `PWD`                            | Mostrar diretório atual |
-| `binary` (`bin`)           | `TYPE I`                         | Modo binário            |
-| `ascii`                    | `TYPE A`                         | Modo texto              |
-| *(sem equivalente direto)* | `USER`                           | Informar usuário        |
-| *(sem equivalente direto)* | `PASS`                           | Informar senha          |
-| *(sem equivalente direto)* | `PASV`                           | Modo passivo            |
-| *(sem equivalente direto)* | `PORT`                           | Modo ativo              |
-
----
-
-##  Exemplos reais capturados no servidor
-
-Com o sistema de logs implementado, é possível visualizar os comandos reais trafegando:
-
-```
-USER admin
-PASS ***
-CWD /arquivos
-LIST
-PASV
-RETR arquivo.txt
-STOR upload.txt
-```
-
-Isso mostra que:
-
-* O cliente pode usar `get`, mas o servidor recebe `RETR`
-* O cliente pode usar `put`, mas o servidor recebe `STOR`
-
----
-
-##  Sobre `BIN` e `HASH`
-
-Alguns comandos vistos em clientes FTP não fazem parte diretamente do protocolo:
-
-| Comando          | Equivalente real                                     |
-| ---------------- | ---------------------------------------------------- |
-| `bin` / `binary` | `TYPE I`                                             |
-| `hash`           | Não existe no protocolo (apenas visual de progresso) |
-
- O comando `HASH` não é enviado ao servidor — ele é apenas um recurso visual do cliente.
-
----
-
-##  Conclusão
-
-O projeto utiliza os comandos reais do protocolo FTP porque:
-
-* Segue o padrão oficial
-* Utiliza bibliotecas que operam em nível de protocolo
-* Garante compatibilidade com qualquer cliente FTP
-
-Os comandos como `cd`, `get`, `put` são apenas abstrações criadas para facilitar o uso humano, mas não fazem parte da comunicação real entre cliente e servidor.
+- edite o `.env`
+- reinicie `npm run start:ftp`
+- reinicie `npm start`

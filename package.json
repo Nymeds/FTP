@@ -1,11 +1,13 @@
 {
   "name": "ftp",
   "version": "1.0.0",
-  "description": "",
-  "main": "client.js",
+  "description": "Ferramenta de transferencia de arquivos via FTP com servidor Python e interface React.",
+  "main": "backend/web.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node server.js"
+    "build": "vite build --config frontend/vite.config.mjs",
+    "dev": "vite --config frontend/vite.config.mjs",
+    "start": "node backend/web.js",
+    "start:ftp": "python backend/server.py"
   },
   "repository": {
     "type": "git",
@@ -23,6 +25,12 @@
     "basic-ftp": "^5.2.0",
     "express": "^5.2.1",
     "ftp-srv": "^4.6.3",
-    "multer": "^2.1.1"
+    "multer": "^2.1.1",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^6.0.1",
+    "vite": "^8.0.1"
   }
 }

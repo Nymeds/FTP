@@ -1,13 +1,15 @@
 # Dependências
 node_modules/
+frontend/dist/
+backend/__pycache__/
 
 # Arquivos temporários
-uploads/
+backend/uploads/
 download_*
 preview_*
 
 # Arquivos FTP
-arquivos/*
+backend/arquivos/*
 
 # Logs
 *.log
@@ -19,6 +21,7 @@ Thumbs.db
 
 # Configurações locais
 .env
+backend/certs/
 
 # IDE
 .vscode/
